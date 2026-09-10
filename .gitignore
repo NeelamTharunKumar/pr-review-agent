@@ -1,0 +1,11 @@
+.env
+venv/
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+.DS_Store
+desktop.ini
+codebase_index/
+pkgs_tmp/
+*.egg-info/
