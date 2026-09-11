@@ -1,6 +1,6 @@
+import logging
 import os
 import re
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -44,24 +44,28 @@ def chunk_javascript(filepath: str, content: str) -> list[dict]:
                     name = g
                     break
 
-        chunks.append({
-            "text": chunk_text,
-            "filepath": filepath,
-            "start_line": start + 1,
-            "end_line": end,
-            "type": "function/class",
-            "name": name,
-        })
+        chunks.append(
+            {
+                "text": chunk_text,
+                "filepath": filepath,
+                "start_line": start + 1,
+                "end_line": end,
+                "type": "function/class",
+                "name": name,
+            }
+        )
 
     if not chunks and len(content.strip()) > 0 and len(content) < 5000:
-        chunks.append({
-            "text": content,
-            "filepath": filepath,
-            "start_line": 1,
-            "end_line": len(lines),
-            "type": "module",
-            "name": filepath,
-        })
+        chunks.append(
+            {
+                "text": content,
+                "filepath": filepath,
+                "start_line": 1,
+                "end_line": len(lines),
+                "type": "module",
+                "name": filepath,
+            }
+        )
 
     return chunks
 
@@ -108,24 +112,28 @@ def chunk_go(filepath: str, content: str) -> list[dict]:
         elif "interface" in chunk_text[:100]:
             chunk_type = "interface"
 
-        chunks.append({
-            "text": chunk_text,
-            "filepath": filepath,
-            "start_line": start + 1,
-            "end_line": end,
-            "type": chunk_type,
-            "name": name,
-        })
+        chunks.append(
+            {
+                "text": chunk_text,
+                "filepath": filepath,
+                "start_line": start + 1,
+                "end_line": end,
+                "type": chunk_type,
+                "name": name,
+            }
+        )
 
     if not chunks and len(content.strip()) > 0 and len(content) < 5000:
-        chunks.append({
-            "text": content,
-            "filepath": filepath,
-            "start_line": 1,
-            "end_line": len(lines),
-            "type": "package",
-            "name": filepath,
-        })
+        chunks.append(
+            {
+                "text": content,
+                "filepath": filepath,
+                "start_line": 1,
+                "end_line": len(lines),
+                "type": "package",
+                "name": filepath,
+            }
+        )
 
     return chunks
 
@@ -178,24 +186,28 @@ def chunk_rust(filepath: str, content: str) -> list[dict]:
         elif "trait" in chunk_text[:100]:
             chunk_type = "trait"
 
-        chunks.append({
-            "text": chunk_text,
-            "filepath": filepath,
-            "start_line": start + 1,
-            "end_line": end,
-            "type": chunk_type,
-            "name": name,
-        })
+        chunks.append(
+            {
+                "text": chunk_text,
+                "filepath": filepath,
+                "start_line": start + 1,
+                "end_line": end,
+                "type": chunk_type,
+                "name": name,
+            }
+        )
 
     if not chunks and len(content.strip()) > 0 and len(content) < 5000:
-        chunks.append({
-            "text": content,
-            "filepath": filepath,
-            "start_line": 1,
-            "end_line": len(lines),
-            "type": "module",
-            "name": filepath,
-        })
+        chunks.append(
+            {
+                "text": content,
+                "filepath": filepath,
+                "start_line": 1,
+                "end_line": len(lines),
+                "type": "module",
+                "name": filepath,
+            }
+        )
 
     return chunks
 
@@ -233,14 +245,16 @@ def _chunk_by_lines(filepath: str, content: str) -> list[dict]:
         chunk_text = "\n".join(chunk_lines)
 
         if chunk_text.strip():
-            chunks.append({
-                "text": chunk_text,
-                "filepath": filepath,
-                "start_line": i + 1,
-                "end_line": min(i + chunk_size, len(lines)),
-                "type": "chunk",
-                "name": f"{filepath}:{i + 1}",
-            })
+            chunks.append(
+                {
+                    "text": chunk_text,
+                    "filepath": filepath,
+                    "start_line": i + 1,
+                    "end_line": min(i + chunk_size, len(lines)),
+                    "type": "chunk",
+                    "name": f"{filepath}:{i + 1}",
+                }
+            )
 
         i += chunk_size - overlap
 

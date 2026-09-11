@@ -2,19 +2,20 @@ import json
 import logging
 import os
 import re
+
 import chromadb
-from app.config import settings
-from app.core.schemas import PRContext
-from app.core.utils import safe_collection_name
 from google import genai
 from google.genai import types
 from rank_bm25 import BM25Okapi
+
+from app.config import settings
+from app.core.schemas import PRContext
+from app.core.utils import safe_collection_name
 
 logger = logging.getLogger(__name__)
 
 
 class CodebaseRetriever:
-
     def __init__(self):
         self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
         self.chroma_client = chromadb.PersistentClient(path="./codebase_index")
@@ -28,7 +29,7 @@ class CodebaseRetriever:
             return None
 
     def _tokenize(self, text: str) -> list[str]:
-        return re.findall(r'[a-zA-Z0-9_]+', text.lower())
+        return re.findall(r"[a-zA-Z0-9_]+", text.lower())
 
     def _load_bm25(self, repo_name: str):
         if repo_name in self._bm25_cache:
@@ -39,15 +40,13 @@ class CodebaseRetriever:
             return None
 
         try:
-            with open(corpus_path, "r", encoding="utf-8") as f:
+            with open(corpus_path, encoding="utf-8") as f:
                 corpus = json.load(f)
 
             tokenized = [self._tokenize(doc["text"]) for doc in corpus]
             bm25 = BM25Okapi(tokenized)
             self._bm25_cache[repo_name] = (bm25, corpus)
-            logger.info(
-                f"[Retriever] Loaded BM25 index ({len(corpus)} docs) for {repo_name}"
-            )
+            logger.info(f"[Retriever] Loaded BM25 index ({len(corpus)} docs) for {repo_name}")
             return self._bm25_cache[repo_name]
         except Exception as e:
             logger.warning(f"[Retriever] Failed to load BM25 corpus: {e}")
@@ -65,8 +64,7 @@ class CodebaseRetriever:
 
         if not collection:
             logger.warning(
-                f"[Retriever] No index found for {context.repo_name}. "
-                f"Run ingestion first."
+                f"[Retriever] No index found for {context.repo_name}. Run ingestion first."
             )
             return ""
 
@@ -78,9 +76,7 @@ class CodebaseRetriever:
             response = self.gemini_client.models.embed_content(
                 model="gemini-embedding-2",
                 contents=query_text,
-                config=types.EmbedContentConfig(
-                    task_type="RETRIEVAL_QUERY"
-                )
+                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
             )
             query_embedding = response.embeddings[0].values
         except Exception as e:
@@ -125,9 +121,7 @@ class CodebaseRetriever:
             bm25, corpus = bm25_data
             tokenized_query = self._tokenize(query_text)
             scores = bm25.get_scores(tokenized_query)
-            scored_indices = sorted(
-                enumerate(scores), key=lambda x: x[1], reverse=True
-            )[:vector_n]
+            scored_indices = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)[:vector_n]
             bm25_results = [
                 (corpus[i]["text"], corpus[i], scores[i])
                 for i, score in scored_indices
@@ -137,9 +131,9 @@ class CodebaseRetriever:
         # 3. Fuse with RRF
         fused = {}
         if vector_results and vector_results["documents"][0]:
-            for rank, (doc, meta) in enumerate(zip(
-                vector_results["documents"][0], vector_results["metadatas"][0]
-            )):
+            for rank, (doc, meta) in enumerate(
+                zip(vector_results["documents"][0], vector_results["metadatas"][0], strict=False)
+            ):
                 key = f"{meta['filepath']}:{meta['start_line']}-{meta['end_line']}"
                 fused[key] = {
                     "text": doc,
@@ -147,11 +141,11 @@ class CodebaseRetriever:
                     "start_line": meta["start_line"],
                     "end_line": meta["end_line"],
                     "rrf": 1.0 / (60 + rank),
-                    "source": "vector"
+                    "source": "vector",
                 }
 
         if bm25_results:
-            for rank, (text, meta, score) in enumerate(bm25_results):
+            for rank, (text, meta, _score) in enumerate(bm25_results):
                 key = f"{meta['filepath']}:{meta['start_line']}-{meta['end_line']}"
                 if key in fused:
                     fused[key]["rrf"] += 1.0 / (60 + rank)
@@ -163,15 +157,13 @@ class CodebaseRetriever:
                         "start_line": meta["start_line"],
                         "end_line": meta["end_line"],
                         "rrf": 1.0 / (60 + rank),
-                        "source": "bm25"
+                        "source": "bm25",
                     }
 
         if not fused:
             return ""
 
-        sorted_results = sorted(
-            fused.values(), key=lambda x: x["rrf"], reverse=True
-        )[:n_results]
+        sorted_results = sorted(fused.values(), key=lambda x: x["rrf"], reverse=True)[:n_results]
 
         for r in sorted_results:
             logger.info(
@@ -184,15 +176,11 @@ class CodebaseRetriever:
             "RELEVANT CODEBASE CONTEXT "
             "(retrieved by hybrid search: vector similarity + keyword matching):"
         ]
-        context_parts.append(
-            "These files are related to this PR's changes:\n"
-        )
+        context_parts.append("These files are related to this PR's changes:\n")
 
         for r in sorted_results:
             context_parts.append(
-                f"--- {r['filepath']} "
-                f"(lines {r['start_line']}-{r['end_line']}) "
-                f"[{r['source']}] ---"
+                f"--- {r['filepath']} (lines {r['start_line']}-{r['end_line']}) [{r['source']}] ---"
             )
             context_parts.append(r["text"])
             context_parts.append("")

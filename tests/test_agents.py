@@ -1,4 +1,5 @@
 import pytest
+
 from app.agents.reviewer import ReviewerAgent
 from app.core.schemas import ReviewResult
 from app.core.utils import parse_json_response
@@ -17,7 +18,9 @@ class TestParseJson:
         assert result["approved"] is True
 
     def test_with_json_codeblock(self):
-        raw = '```json\n{"overall_score": 7, "approved": false, "summary": "Ok", "comments": []}\n```'
+        raw = (
+            '```json\n{"overall_score": 7, "approved": false, "summary": "Ok", "comments": []}\n```'
+        )
         result = parse_json_response(raw)
         assert result["overall_score"] == 7
         assert result["approved"] is False
@@ -43,7 +46,9 @@ class TestParseJson:
         assert result["overall_score"] == 6
 
     def test_json_only_start_codeblock(self):
-        raw = '```json\n{"overall_score": 10, "approved": true, "summary": "Perfect", "comments": []}'
+        raw = (
+            '```json\n{"overall_score": 10, "approved": true, "summary": "Perfect", "comments": []}'
+        )
         result = parse_json_response(raw)
         assert result["overall_score"] == 10
 

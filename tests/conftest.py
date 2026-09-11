@@ -1,9 +1,11 @@
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from app.core.schemas import PRContext, ChangedFile, ReviewResult, ReviewComment, RepoContext
+
+from app.core.schemas import ChangedFile, PRContext, RepoContext, ReviewComment, ReviewResult
 
 
 @pytest.fixture

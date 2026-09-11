@@ -1,5 +1,7 @@
 import logging
+
 from groq import Groq
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,6 +22,7 @@ class LLMClient:
     def gemini(self):
         if self._gemini is None:
             from google import genai
+
             self._gemini = genai.Client(api_key=settings.GEMINI_API_KEY)
         return self._gemini
 

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
+
 from pydantic import BaseModel
-from typing import List, Optional
 
 
 @dataclass
@@ -33,9 +33,9 @@ class PRContext:
     base_branch: str
     head_branch: str
     head_sha: str = ""
-    rag_context: Optional[str] = ""
+    rag_context: str | None = ""
     files: list[ChangedFile] = field(default_factory=list)
-    repo_context: Optional[RepoContext] = None
+    repo_context: RepoContext | None = None
     truncated_files: list[dict] = field(default_factory=list)
 
 
@@ -52,4 +52,4 @@ class ReviewResult(BaseModel):
     overall_score: int
     approved: bool
     summary: str
-    comments: List[ReviewComment]
+    comments: list[ReviewComment]

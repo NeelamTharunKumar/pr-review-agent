@@ -1,16 +1,17 @@
-import pytest
 from app.core.schemas import (
     ChangedFile,
     PRContext,
     RepoContext,
-    ReviewResult,
     ReviewComment,
+    ReviewResult,
 )
 
 
 class TestChangedFile:
     def test_create(self):
-        f = ChangedFile(filename="a.py", status="modified", additions=5, deletions=2, patch="@@ +1 @@\n+line")
+        f = ChangedFile(
+            filename="a.py", status="modified", additions=5, deletions=2, patch="@@ +1 @@\n+line"
+        )
         assert f.filename == "a.py"
         assert f.additions == 5
         assert f.deletions == 2
@@ -35,8 +36,12 @@ class TestRepoContext:
 
     def test_recent_prs_default(self):
         rc = RepoContext(
-            name="org/repo", description="D", primary_language="Python",
-            languages="Python", file_structure="src/", readme_summary="R",
+            name="org/repo",
+            description="D",
+            primary_language="Python",
+            languages="Python",
+            file_structure="src/",
+            readme_summary="R",
         )
         assert rc.recent_pr_titles == []
 
@@ -44,8 +49,13 @@ class TestRepoContext:
 class TestPRContext:
     def test_minimal(self):
         ctx = PRContext(
-            repo_name="org/repo", pr_number=1, title="T", description="D",
-            author="a", base_branch="main", head_branch="feat",
+            repo_name="org/repo",
+            pr_number=1,
+            title="T",
+            description="D",
+            author="a",
+            base_branch="main",
+            head_branch="feat",
         )
         assert ctx.repo_name == "org/repo"
         assert ctx.files == []
@@ -54,8 +64,13 @@ class TestPRContext:
     def test_with_files(self):
         f = ChangedFile(filename="a.py", status="modified", additions=1, deletions=0, patch="+")
         ctx = PRContext(
-            repo_name="org/repo", pr_number=1, title="T", description="D",
-            author="a", base_branch="main", head_branch="feat",
+            repo_name="org/repo",
+            pr_number=1,
+            title="T",
+            description="D",
+            author="a",
+            base_branch="main",
+            head_branch="feat",
             files=[f],
         )
         assert len(ctx.files) == 1
@@ -63,12 +78,21 @@ class TestPRContext:
 
 class TestReviewComment:
     def test_create(self):
-        c = ReviewComment(filename="a.py", line=10, issue="Bug", suggestion="Fix", severity="critical")
+        c = ReviewComment(
+            filename="a.py", line=10, issue="Bug", suggestion="Fix", severity="critical"
+        )
         assert c.filename == "a.py"
         assert c.confidence == 1.0
 
     def test_with_confidence(self):
-        c = ReviewComment(filename="a.py", line=10, issue="Bug", suggestion="Fix", severity="warning", confidence=0.75)
+        c = ReviewComment(
+            filename="a.py",
+            line=10,
+            issue="Bug",
+            suggestion="Fix",
+            severity="warning",
+            confidence=0.75,
+        )
         assert c.confidence == 0.75
 
 

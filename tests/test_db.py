@@ -2,16 +2,15 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.database import Base
-from app.db import models  # noqa: ensure models are registered
+from app.core.schemas import ChangedFile, PRContext, ReviewComment, ReviewResult
 from app.db.crud import (
-    save_review,
-    save_evaluation_metrics,
+    get_all_reviews,
     get_review_by_pr,
     get_stats,
-    get_all_reviews,
+    save_evaluation_metrics,
+    save_review,
 )
-from app.core.schemas import PRContext, ChangedFile, ReviewResult, ReviewComment
+from app.db.database import Base
 
 
 @pytest.fixture

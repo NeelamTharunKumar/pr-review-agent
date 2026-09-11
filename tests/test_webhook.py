@@ -1,12 +1,13 @@
-import json
-import hmac
 import hashlib
+import hmac
+import json
 from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app, verify_github_signature
 from app.config import settings
+from app.main import app, verify_github_signature
 
 
 @pytest.fixture
@@ -20,9 +21,7 @@ def override_secret(monkeypatch):
 
 
 def _sign(payload: bytes, secret: str = "test_secret") -> str:
-    return "sha256=" + hmac.new(
-        secret.encode(), payload, hashlib.sha256
-    ).hexdigest()
+    return "sha256=" + hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
 
 
 class TestVerifySignature:

@@ -1,17 +1,23 @@
 import logging
+
 from github import Auth, Github, GithubException
+
 from app.config import settings
-from app.core.schemas import ReviewResult, PRContext
+from app.core.schemas import PRContext, ReviewResult
 
 logger = logging.getLogger(__name__)
 
 
 class PosterAgent:
-
     def __init__(self):
         self.client = Github(auth=Auth.Token(settings.GITHUB_TOKEN))
 
-    def run(self, context: PRContext, result: ReviewResult, comment_evaluations: list[bool] | None = None) -> bool:
+    def run(
+        self,
+        context: PRContext,
+        result: ReviewResult,
+        comment_evaluations: list[bool] | None = None,
+    ) -> bool:
         logger.info(f"[PosterAgent] Posting review for PR #{context.pr_number}")
 
         valid_count = len(result.comments)
@@ -19,7 +25,9 @@ class PosterAgent:
             valid_count = sum(1 for v in comment_evaluations if v)
             filtered_count = len(result.comments) - valid_count
             if filtered_count > 0:
-                logger.info(f"[PosterAgent] Filtering out {filtered_count} hallucinated comments, keeping {valid_count} valid comments")
+                logger.info(
+                    f"[PosterAgent] Filtering out {filtered_count} hallucinated comments, keeping {valid_count} valid comments"
+                )
 
         try:
             repo = self.client.get_repo(context.repo_name)
@@ -31,7 +39,9 @@ class PosterAgent:
         try:
             bot_user = self.client.get_user().login
         except GithubException as e:
-            logger.warning(f"[PosterAgent] Could not fetch bot username: {e}. Defaulting to COMMENT.")
+            logger.warning(
+                f"[PosterAgent] Could not fetch bot username: {e}. Defaulting to COMMENT."
+            )
             bot_user = None
 
         is_self_pr = bot_user is not None and context.author == bot_user
@@ -56,49 +66,43 @@ class PosterAgent:
                 event=review_event,
                 comments=inline_comments,
             )
-            logger.info(
-                f"[PosterAgent] Review posted successfully. "
-                f"Verdict: {review_event}"
-            )
+            logger.info(f"[PosterAgent] Review posted successfully. Verdict: {review_event}")
             return True
 
         except GithubException as e:
             logger.error(f"[PosterAgent] Failed to post full review: {e}")
-            logger.info(f"[PosterAgent] Attempting fallback — posting summary only")
+            logger.info("[PosterAgent] Attempting fallback — posting summary only")
 
             try:
                 pr.create_issue_comment(summary_body)
-                logger.info(f"[PosterAgent] Fallback summary posted successfully")
+                logger.info("[PosterAgent] Fallback summary posted successfully")
                 return True
             except GithubException as e2:
                 logger.error(f"[PosterAgent] Fallback also failed: {e2}")
                 return False
 
-    def _build_summary(self, context: PRContext, result: ReviewResult, comment_evaluations: list[bool] | None = None) -> str:
+    def _build_summary(
+        self,
+        context: PRContext,
+        result: ReviewResult,
+        comment_evaluations: list[bool] | None = None,
+    ) -> str:
         filled = "█" * result.overall_score
         empty = "░" * (10 - result.overall_score)
         score_bar = filled + empty
 
         if comment_evaluations:
             valid_comments = [
-                c for i, c in enumerate(result.comments)
+                c
+                for i, c in enumerate(result.comments)
                 if i < len(comment_evaluations) and comment_evaluations[i]
             ]
         else:
             valid_comments = list(result.comments)
 
-        critical_count = sum(
-            1 for c in valid_comments
-            if c.severity == "critical"
-        )
-        warning_count = sum(
-            1 for c in valid_comments
-            if c.severity == "warning"
-        )
-        suggestion_count = sum(
-            1 for c in valid_comments
-            if c.severity == "suggestion"
-        )
+        critical_count = sum(1 for c in valid_comments if c.severity == "critical")
+        warning_count = sum(1 for c in valid_comments if c.severity == "warning")
+        suggestion_count = sum(1 for c in valid_comments if c.severity == "suggestion")
 
         if result.approved:
             status_line = "✅ **APPROVED**"
@@ -161,7 +165,7 @@ class PosterAgent:
 *Important: Issues may exist in the un-reviewed portions of these files. Please review manually.*
 """
 
-        body += f"""
+        body += """
 ---
 
 *🤖 This review was generated automatically by the PR Review Agent*
@@ -170,12 +174,15 @@ class PosterAgent:
 
         return body
 
-    def _build_inline_comments(self, result: ReviewResult, comment_evaluations: list[bool] | None = None) -> list:
+    def _build_inline_comments(
+        self, result: ReviewResult, comment_evaluations: list[bool] | None = None
+    ) -> list:
         inline_comments = []
 
         if comment_evaluations:
             valid_comments = [
-                c for i, c in enumerate(result.comments)
+                c
+                for i, c in enumerate(result.comments)
                 if i < len(comment_evaluations) and comment_evaluations[i]
             ]
         else:
@@ -205,11 +212,13 @@ class PosterAgent:
 *Generated by AI Code Review Agent*"""
 
             # GitHub review comments expect new-file `line` + `side`, not diff `position`.
-            inline_comments.append({
-                "path": comment.filename,
-                "line": comment.line,
-                "side": "RIGHT",
-                "body": comment_body,
-            })
+            inline_comments.append(
+                {
+                    "path": comment.filename,
+                    "line": comment.line,
+                    "side": "RIGHT",
+                    "body": comment_body,
+                }
+            )
 
         return inline_comments

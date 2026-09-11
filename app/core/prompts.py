@@ -114,14 +114,10 @@ def build_user_prompt(context) -> str:
     ]
 
     for changed_file in context.files:
-
         if not changed_file.patch:
             continue
 
-        should_skip = any(
-            pattern in changed_file.filename
-            for pattern in skip_patterns
-        )
+        should_skip = any(pattern in changed_file.filename for pattern in skip_patterns)
 
         if should_skip:
             continue
@@ -135,19 +131,21 @@ def build_user_prompt(context) -> str:
         diff_lines = changed_file.patch.split("\n")
 
         if len(diff_lines) > settings.MAX_DIFF_LINES_PER_FILE:
-            truncated = "\n".join(diff_lines[:settings.MAX_DIFF_LINES_PER_FILE])
+            truncated = "\n".join(diff_lines[: settings.MAX_DIFF_LINES_PER_FILE])
             prompt += truncated
             omitted = len(diff_lines) - settings.MAX_DIFF_LINES_PER_FILE
             prompt += (
                 f"\n... [diff truncated — first {settings.MAX_DIFF_LINES_PER_FILE} lines shown, "
                 f"{omitted} lines omitted] ...\n"
             )
-            truncated_files.append({
-                "filename": changed_file.filename,
-                "total_lines": len(diff_lines),
-                "shown_lines": settings.MAX_DIFF_LINES_PER_FILE,
-                "omitted_lines": omitted
-            })
+            truncated_files.append(
+                {
+                    "filename": changed_file.filename,
+                    "total_lines": len(diff_lines),
+                    "shown_lines": settings.MAX_DIFF_LINES_PER_FILE,
+                    "omitted_lines": omitted,
+                }
+            )
         else:
             prompt += changed_file.patch
 

@@ -1,7 +1,9 @@
 import logging
+
 from sqlalchemy.orm import Session
-from app.db.models import PRReview, ReviewComment, EvaluationMetrics
+
 from app.core.schemas import PRContext, ReviewResult
+from app.db.models import EvaluationMetrics, PRReview, ReviewComment
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +13,10 @@ def save_review(
     context: PRContext,
     result: ReviewResult,
     posted: bool,
-    comment_evaluations: list = None
+    comment_evaluations: list | None = None,
 ) -> PRReview:
 
-    logger.info(
-        f"[DB] Saving review for PR #{context.pr_number} "
-        f"in {context.repo_name}"
-    )
+    logger.info(f"[DB] Saving review for PR #{context.pr_number} in {context.repo_name}")
 
     try:
         review = PRReview(
@@ -57,9 +56,7 @@ def save_review(
         db.refresh(review)
 
         logger.info(
-            f"[DB] Saved successfully — "
-            f"Review ID: {review.id} | "
-            f"Comments: {len(result.comments)}"
+            f"[DB] Saved successfully — Review ID: {review.id} | Comments: {len(result.comments)}"
         )
 
         return review
@@ -70,11 +67,7 @@ def save_review(
         raise
 
 
-def save_evaluation_metrics(
-    db: Session,
-    review_id: int,
-    metrics: dict
-) -> EvaluationMetrics:
+def save_evaluation_metrics(db: Session, review_id: int, metrics: dict) -> EvaluationMetrics:
 
     logger.info(f"[DB] Saving evaluation metrics for review {review_id}")
 
@@ -109,18 +102,14 @@ def save_evaluation_metrics(
         raise
 
 
-def get_review_by_pr(
-    db: Session,
-    repo_name: str,
-    pr_number: int
-) -> PRReview:
+def get_review_by_pr(db: Session, repo_name: str, pr_number: int) -> PRReview:
 
-    review = db.query(PRReview).filter(
-        PRReview.repo_name == repo_name,
-        PRReview.pr_number == pr_number
-    ).order_by(
-        PRReview.created_at.desc()
-    ).first()
+    review = (
+        db.query(PRReview)
+        .filter(PRReview.repo_name == repo_name, PRReview.pr_number == pr_number)
+        .order_by(PRReview.created_at.desc())
+        .first()
+    )
 
     if review:
         logger.info(
@@ -141,27 +130,25 @@ def has_reviewed_head(
 ) -> bool:
     if not head_sha:
         return False
-    review = db.query(PRReview).filter(
-        PRReview.repo_name == repo_name,
-        PRReview.pr_number == pr_number,
-        PRReview.head_sha == head_sha,
-    ).first()
+    review = (
+        db.query(PRReview)
+        .filter(
+            PRReview.repo_name == repo_name,
+            PRReview.pr_number == pr_number,
+            PRReview.head_sha == head_sha,
+        )
+        .first()
+    )
     if review:
         logger.info(
-            f"[DB] PR #{pr_number} already reviewed at SHA {head_sha[:8]} "
-            f"— skipping (idempotency)"
+            f"[DB] PR #{pr_number} already reviewed at SHA {head_sha[:8]} — skipping (idempotency)"
         )
     return review is not None
 
 
-def get_all_reviews(
-    db: Session,
-    limit: int = 50
-) -> list:
+def get_all_reviews(db: Session, limit: int = 50) -> list:
 
-    reviews = db.query(PRReview).order_by(
-        PRReview.created_at.desc()
-    ).limit(limit).all()
+    reviews = db.query(PRReview).order_by(PRReview.created_at.desc()).limit(limit).all()
 
     logger.info(f"[DB] Fetched {len(reviews)} reviews")
 
@@ -172,25 +159,15 @@ def get_stats(db: Session) -> dict:
 
     total = db.query(PRReview).count()
 
-    approved = db.query(PRReview).filter(
-        PRReview.approved.is_(True)
-    ).count()
+    approved = db.query(PRReview).filter(PRReview.approved.is_(True)).count()
 
-    rejected = db.query(PRReview).filter(
-        PRReview.approved.is_(False)
-    ).count()
+    rejected = db.query(PRReview).filter(PRReview.approved.is_(False)).count()
 
-    critical_comments = db.query(ReviewComment).filter(
-        ReviewComment.severity == "critical"
-    ).count()
+    critical_comments = db.query(ReviewComment).filter(ReviewComment.severity == "critical").count()
 
-    hallucinated = db.query(ReviewComment).filter(
-        ReviewComment.is_valid_line.is_(False)
-    ).count()
+    hallucinated = db.query(ReviewComment).filter(ReviewComment.is_valid_line.is_(False)).count()
 
-    valid_comments = db.query(ReviewComment).filter(
-        ReviewComment.is_valid_line.is_(True)
-    ).count()
+    valid_comments = db.query(ReviewComment).filter(ReviewComment.is_valid_line.is_(True)).count()
 
     return {
         "total_reviews": total,
@@ -214,25 +191,15 @@ def get_evaluation_report(db: Session) -> dict:
 
     total = len(all_metrics)
 
-    avg_quality = sum(
-        m.quality_score for m in all_metrics
-    ) / total
+    avg_quality = sum(m.quality_score for m in all_metrics) / total
 
-    avg_hallucination = sum(
-        m.hallucination_rate for m in all_metrics
-    ) / total
+    avg_hallucination = sum(m.hallucination_rate for m in all_metrics) / total
 
-    avg_coverage = sum(
-        m.coverage_rate for m in all_metrics
-    ) / total
+    avg_coverage = sum(m.coverage_rate for m in all_metrics) / total
 
-    total_hallucinations = sum(
-        m.hallucinated_comments for m in all_metrics
-    )
+    total_hallucinations = sum(m.hallucinated_comments for m in all_metrics)
 
-    total_comments = sum(
-        m.total_comments for m in all_metrics
-    )
+    total_comments = sum(m.total_comments for m in all_metrics)
 
     return {
         "total_reviews_evaluated": total,

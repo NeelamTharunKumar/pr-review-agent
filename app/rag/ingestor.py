@@ -1,36 +1,54 @@
-import os
 import ast
+import hashlib
 import json
 import logging
-import hashlib
+import os
 from pathlib import Path
-from github import Auth, Github, GithubException
+
 import chromadb
+from github import Auth, Github, GithubException
+from google import genai
+from google.genai import types
+
 from app.config import settings
 from app.core.utils import safe_collection_name
 from app.rag.chunkers import chunk_file
 
-from google import genai
-from google.genai import types
-
 logger = logging.getLogger(__name__)
 
 INDEXABLE_EXTENSIONS = {
-    ".py", ".js", ".ts", ".java", ".go",
-    ".rb", ".rs", ".cpp", ".c", ".cs",
-    ".jsx", ".tsx", ".vue", ".swift"
+    ".py",
+    ".js",
+    ".ts",
+    ".java",
+    ".go",
+    ".rb",
+    ".rs",
+    ".cpp",
+    ".c",
+    ".cs",
+    ".jsx",
+    ".tsx",
+    ".vue",
+    ".swift",
 }
 
 SKIP_PATTERNS = [
-    "node_modules", "__pycache__", ".git",
-    "dist", "build", ".next", "venv",
-    "package-lock.json", "yarn.lock",
-    ".min.js", ".min.css"
+    "node_modules",
+    "__pycache__",
+    ".git",
+    "dist",
+    "build",
+    ".next",
+    "venv",
+    "package-lock.json",
+    "yarn.lock",
+    ".min.js",
+    ".min.css",
 ]
 
 
 class CodebaseIngestor:
-
     def __init__(self):
         self.github_client = Github(auth=Auth.Token(settings.GITHUB_TOKEN))
         self.gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
@@ -39,8 +57,7 @@ class CodebaseIngestor:
     def get_or_create_collection(self, repo_name: str):
         collection_name = safe_collection_name(repo_name)
         return self.chroma_client.get_or_create_collection(
-            name=collection_name,
-            metadata={"repo": repo_name}
+            name=collection_name, metadata={"repo": repo_name}
         )
 
     def ingest_repo(self, repo_name: str, branch: str | None = None, force: bool = False) -> dict:
@@ -115,15 +132,11 @@ class CodebaseIngestor:
                         ext = Path(item.path).suffix.lower()
                         if ext in INDEXABLE_EXTENSIONS:
                             try:
-                                content = item.decoded_content.decode(
-                                    "utf-8", errors="ignore"
-                                )
+                                content = item.decoded_content.decode("utf-8", errors="ignore")
                                 if len(content) < 100000:
                                     files[item.path] = content
                             except Exception as e:
-                                logger.warning(
-                                    f"[Ingestor] Could not read {item.path}: {e}"
-                                )
+                                logger.warning(f"[Ingestor] Could not read {item.path}: {e}")
             except Exception as e:
                 logger.warning(f"[Ingestor] Could not fetch {path}: {e}")
 
@@ -157,28 +170,32 @@ class CodebaseIngestor:
                     if len(chunk_text.strip()) < 50:
                         continue
 
-                    chunks.append({
-                        "text": chunk_text,
-                        "filepath": filepath,
-                        "start_line": start_line + 1,
-                        "end_line": end_line,
-                        "type": type(node).__name__,
-                        "name": node.name
-                    })
+                    chunks.append(
+                        {
+                            "text": chunk_text,
+                            "filepath": filepath,
+                            "start_line": start_line + 1,
+                            "end_line": end_line,
+                            "type": type(node).__name__,
+                            "name": node.name,
+                        }
+                    )
 
         except SyntaxError:
             logger.warning(f"[Ingestor] AST parse failed for {filepath}, using line chunking")
             return self._chunk_by_lines(filepath, content)
 
         if not chunks and len(content) < 5000:
-            chunks.append({
-                "text": content,
-                "filepath": filepath,
-                "start_line": 1,
-                "end_line": len(content.split("\n")),
-                "type": "module",
-                "name": filepath
-            })
+            chunks.append(
+                {
+                    "text": content,
+                    "filepath": filepath,
+                    "start_line": 1,
+                    "end_line": len(content.split("\n")),
+                    "type": "module",
+                    "name": filepath,
+                }
+            )
 
         return chunks
 
@@ -190,18 +207,20 @@ class CodebaseIngestor:
         i = 0
 
         while i < len(lines):
-            chunk_lines = lines[i:i + chunk_size]
+            chunk_lines = lines[i : i + chunk_size]
             chunk_text = "\n".join(chunk_lines)
 
             if chunk_text.strip():
-                chunks.append({
-                    "text": chunk_text,
-                    "filepath": filepath,
-                    "start_line": i + 1,
-                    "end_line": min(i + chunk_size, len(lines)),
-                    "type": "chunk",
-                    "name": f"{filepath}:{i+1}"
-                })
+                chunks.append(
+                    {
+                        "text": chunk_text,
+                        "filepath": filepath,
+                        "start_line": i + 1,
+                        "end_line": min(i + chunk_size, len(lines)),
+                        "type": "chunk",
+                        "name": f"{filepath}:{i + 1}",
+                    }
+                )
 
             i += chunk_size - overlap
 
@@ -233,9 +252,7 @@ class CodebaseIngestor:
 
     def _remove_file_chunks(self, collection, repo_name: str, filepath: str):
         try:
-            collection.delete(
-                where={"repo": repo_name, "filepath": filepath}
-            )
+            collection.delete(where={"repo": repo_name, "filepath": filepath})
         except Exception as e:
             logger.warning(f"[Ingestor] Could not remove chunks for {filepath}: {e}")
 
@@ -245,9 +262,7 @@ class CodebaseIngestor:
         embeddings = self._get_embeddings_safe(texts)
 
         if not embeddings:
-            logger.error(
-                f"[Ingestor] No embeddings returned for {filepath} — skipping"
-            )
+            logger.error(f"[Ingestor] No embeddings returned for {filepath} — skipping")
             return
 
         if len(embeddings) != len(texts):
@@ -269,15 +284,17 @@ class CodebaseIngestor:
             chunk_id = hashlib.sha256(unique_str.encode()).hexdigest()[:16]
             ids.append(chunk_id)
 
-            metadatas.append({
-                "filepath": chunk["filepath"],
-                "start_line": chunk["start_line"],
-                "end_line": chunk["end_line"],
-                "type": chunk["type"],
-                "name": chunk["name"],
-                "repo": repo_name,
-                "content_hash": content_hash,
-            })
+            metadatas.append(
+                {
+                    "filepath": chunk["filepath"],
+                    "start_line": chunk["start_line"],
+                    "end_line": chunk["end_line"],
+                    "type": chunk["type"],
+                    "name": chunk["name"],
+                    "repo": repo_name,
+                    "content_hash": content_hash,
+                }
+            )
 
         collection.upsert(
             documents=texts,
@@ -286,9 +303,7 @@ class CodebaseIngestor:
             metadatas=metadatas,
         )
 
-        logger.info(
-            f"[Ingestor] Stored {len(chunks)} chunks for {filepath}"
-        )
+        logger.info(f"[Ingestor] Stored {len(chunks)} chunks for {filepath}")
 
     def _get_embeddings_safe(self, texts: list[str]) -> list:
         for attempt in range(1, 4):
@@ -296,9 +311,7 @@ class CodebaseIngestor:
                 response = self.gemini_client.models.embed_content(
                     model="gemini-embedding-2",
                     contents=texts,
-                    config=types.EmbedContentConfig(
-                        task_type="RETRIEVAL_DOCUMENT"
-                    )
+                    config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
                 )
                 embeddings = [emb.values for emb in response.embeddings]
 
@@ -311,13 +324,11 @@ class CodebaseIngestor:
                 )
 
             except Exception as e:
-                logger.warning(
-                    f"[Ingestor] Embedding API error on attempt {attempt}/3: {e}"
-                )
+                logger.warning(f"[Ingestor] Embedding API error on attempt {attempt}/3: {e}")
 
         logger.warning(
-            f"[Ingestor] Batch embed failed after 3 attempts. "
-            f"Falling back to single embedding calls."
+            "[Ingestor] Batch embed failed after 3 attempts. "
+            "Falling back to single embedding calls."
         )
         results = []
         for i, text in enumerate(texts):
@@ -325,21 +336,15 @@ class CodebaseIngestor:
                 response = self.gemini_client.models.embed_content(
                     model="gemini-embedding-2",
                     contents=[text],
-                    config=types.EmbedContentConfig(
-                        task_type="RETRIEVAL_DOCUMENT"
-                    )
+                    config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT"),
                 )
                 if response.embeddings:
                     results.append(response.embeddings[0].values)
                 else:
-                    logger.error(
-                        f"[Ingestor] Single embed returned empty for chunk {i}"
-                    )
+                    logger.error(f"[Ingestor] Single embed returned empty for chunk {i}")
                     return []
             except Exception as e:
-                logger.error(
-                    f"[Ingestor] Single embed failed for chunk {i}: {e}"
-                )
+                logger.error(f"[Ingestor] Single embed failed for chunk {i}: {e}")
                 return []
 
         return results
@@ -347,12 +352,14 @@ class CodebaseIngestor:
     def _save_bm25_corpus(self, repo_name: str, all_chunks: list):
         corpus = []
         for chunk in all_chunks:
-            corpus.append({
-                "text": chunk["text"],
-                "filepath": chunk["filepath"],
-                "start_line": chunk["start_line"],
-                "end_line": chunk["end_line"],
-            })
+            corpus.append(
+                {
+                    "text": chunk["text"],
+                    "filepath": chunk["filepath"],
+                    "start_line": chunk["start_line"],
+                    "end_line": chunk["end_line"],
+                }
+            )
         try:
             os.makedirs("./codebase_index", exist_ok=True)
             corpus_path = f"./codebase_index/bm25_{safe_collection_name(repo_name)}.json"

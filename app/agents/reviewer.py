@@ -1,15 +1,15 @@
 import logging
+
 from app.config import settings
-from app.core.schemas import PRContext, ReviewResult, ReviewComment
 from app.core.prompts import SYSTEM_PROMPT, build_user_prompt
-from app.core.utils import parse_json_response, split_files_into_chunks, SKIP_PATTERNS
+from app.core.schemas import PRContext, ReviewComment, ReviewResult
+from app.core.utils import SKIP_PATTERNS, parse_json_response, split_files_into_chunks
 from app.llm import llm_client
 
 logger = logging.getLogger(__name__)
 
 
 class ReviewerAgent:
-
     MODEL = "llama-3.3-70b-versatile"
     MAX_TOKENS = 4096
     TEMPERATURE = 0.1
@@ -37,8 +37,7 @@ class ReviewerAgent:
 
         if prompt_length > self.CHUNK_SIZE:
             logger.info(
-                f"[ReviewerAgent] Prompt exceeds {self.CHUNK_SIZE} chars — "
-                f"using chunked review"
+                f"[ReviewerAgent] Prompt exceeds {self.CHUNK_SIZE} chars — using chunked review"
             )
             return self._review_chunked(context, user_prompt)
 
@@ -56,7 +55,7 @@ class ReviewerAgent:
             logger.error(f"[ReviewerAgent] LLM call failed: {e}")
             raise
 
-        logger.info(f"[ReviewerAgent] Received response from LLM")
+        logger.info("[ReviewerAgent] Received response from LLM")
 
         review_data = parse_json_response(raw_response)
         result = self._build_result(review_data)
@@ -70,9 +69,7 @@ class ReviewerAgent:
 
         return result
 
-    def _review_chunked(
-        self, context: PRContext, full_prompt: str
-    ) -> ReviewResult:
+    def _review_chunked(self, context: PRContext, full_prompt: str) -> ReviewResult:
         header_lines = []
         in_diff = False
 
@@ -117,9 +114,7 @@ class ReviewerAgent:
 
                 diff_lines_f = f.patch.split("\n")
                 if len(diff_lines_f) > settings.MAX_DIFF_LINES_PER_FILE:
-                    truncated = "\n".join(
-                        diff_lines_f[: settings.MAX_DIFF_LINES_PER_FILE]
-                    )
+                    truncated = "\n".join(diff_lines_f[: settings.MAX_DIFF_LINES_PER_FILE])
                     chunk_prompt += truncated
                     omitted = len(diff_lines_f) - settings.MAX_DIFF_LINES_PER_FILE
                     chunk_prompt += (
@@ -152,8 +147,7 @@ class ReviewerAgent:
                 scores.append(data.get("overall_score", 5))
 
                 logger.info(
-                    f"[ReviewerAgent] Chunk {i} done — "
-                    f"Score: {data.get('overall_score', '?')}/10"
+                    f"[ReviewerAgent] Chunk {i} done — Score: {data.get('overall_score', '?')}/10"
                 )
 
             except Exception as e:
@@ -161,17 +155,12 @@ class ReviewerAgent:
                 scores.append(5)
 
         avg_score = round(sum(scores) / len(scores)) if scores else 5
-        approved = avg_score >= 7 and not any(
-            c.get("severity") == "critical" for c in all_comments
-        )
+        approved = avg_score >= 7 and not any(c.get("severity") == "critical" for c in all_comments)
 
         result = ReviewResult(
             overall_score=avg_score,
             approved=approved,
-            summary=(
-                f"Chunked review ({len(file_chunks)} chunks). "
-                f"Average score: {avg_score}/10"
-            ),
+            summary=(f"Chunked review ({len(file_chunks)} chunks). Average score: {avg_score}/10"),
             comments=[
                 ReviewComment(
                     filename=c["filename"],
@@ -203,14 +192,16 @@ class ReviewerAgent:
                     confidence = 1.0
                 confidence = max(0.0, min(1.0, confidence))
 
-                comments.append(ReviewComment(
-                    filename=c["filename"],
-                    line=c["line"],
-                    issue=c["issue"],
-                    suggestion=c["suggestion"],
-                    severity=c["severity"],
-                    confidence=confidence,
-                ))
+                comments.append(
+                    ReviewComment(
+                        filename=c["filename"],
+                        line=c["line"],
+                        issue=c["issue"],
+                        suggestion=c["suggestion"],
+                        severity=c["severity"],
+                        confidence=confidence,
+                    )
+                )
 
             result = ReviewResult(
                 overall_score=data["overall_score"],

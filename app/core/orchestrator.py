@@ -1,13 +1,14 @@
 import asyncio
 import logging
 import random
+
 from app.agents.fetcher import FetcherAgent
-from app.agents.reviewer import ReviewerAgent
 from app.agents.poster import PosterAgent
-from app.core.evaluator import EvaluatorAgent
-from app.db.database import SessionLocal
-from app.db.crud import save_review, save_evaluation_metrics, has_reviewed_head
+from app.agents.reviewer import ReviewerAgent
 from app.config import settings
+from app.core.evaluator import EvaluatorAgent
+from app.db.crud import has_reviewed_head, save_evaluation_metrics, save_review
+from app.db.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +19,7 @@ MAX_DELAY = 60
 
 async def run_pipeline(repo_name: str, pr_number: int):
 
-    logger.info(
-        f"[Orchestrator] Pipeline started — "
-        f"Repo: {repo_name} | PR: #{pr_number}"
-    )
+    logger.info(f"[Orchestrator] Pipeline started — Repo: {repo_name} | PR: #{pr_number}")
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
@@ -29,9 +27,7 @@ async def run_pipeline(repo_name: str, pr_number: int):
 
             logger.info("[Orchestrator] Stage 1 — Fetching PR data")
             fetcher = FetcherAgent()
-            context = await asyncio.to_thread(
-                fetcher.run, repo_name, pr_number
-            )
+            context = await asyncio.to_thread(fetcher.run, repo_name, pr_number)
 
             logger.info(
                 f"[Orchestrator] Stage 1 complete — "
@@ -64,6 +60,7 @@ async def run_pipeline(repo_name: str, pr_number: int):
             if getattr(settings, "AGENTIC_MODE", False):
                 try:
                     from app.agents.agentic_reviewer import AgenticReviewerAgent
+
                     reviewer = AgenticReviewerAgent()
                     logger.info("[Orchestrator] Using AgenticReviewerAgent")
                 except ImportError:
@@ -86,9 +83,7 @@ async def run_pipeline(repo_name: str, pr_number: int):
 
             logger.info("[Orchestrator] Stage 3 — Evaluating review quality")
             evaluator = EvaluatorAgent()
-            metrics, comment_evaluations = await asyncio.to_thread(
-                evaluator.run, context, result
-            )
+            metrics, comment_evaluations = await asyncio.to_thread(evaluator.run, context, result)
 
             logger.info(
                 f"[Orchestrator] Stage 3 complete — "
@@ -99,9 +94,7 @@ async def run_pipeline(repo_name: str, pr_number: int):
 
             logger.info("[Orchestrator] Stage 4 — Posting review to GitHub")
             poster = PosterAgent()
-            success = await asyncio.to_thread(
-                poster.run, context, result, comment_evaluations
-            )
+            success = await asyncio.to_thread(poster.run, context, result, comment_evaluations)
 
             logger.info(f"[Orchestrator] Stage 4 complete — Posted: {success}")
 
@@ -111,9 +104,7 @@ async def run_pipeline(repo_name: str, pr_number: int):
                 saved = await asyncio.to_thread(
                     save_review, db, context, result, success, comment_evaluations
                 )
-                await asyncio.to_thread(
-                    save_evaluation_metrics, db, saved.id, metrics
-                )
+                await asyncio.to_thread(save_evaluation_metrics, db, saved.id, metrics)
                 logger.info(f"[Orchestrator] Stage 5 complete — Review ID: {saved.id}")
             finally:
                 db.close()
@@ -127,10 +118,7 @@ async def run_pipeline(repo_name: str, pr_number: int):
             return
 
         except Exception as e:
-            logger.error(
-                f"[Orchestrator] Attempt {attempt} failed — "
-                f"{type(e).__name__}: {e}"
-            )
+            logger.error(f"[Orchestrator] Attempt {attempt} failed — {type(e).__name__}: {e}")
 
             if attempt < MAX_RETRIES:
                 delay = min(MAX_DELAY, BASE_DELAY * (2 ** (attempt - 1)))

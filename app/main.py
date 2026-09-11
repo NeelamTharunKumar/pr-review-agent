@@ -1,9 +1,11 @@
-import hmac
 import hashlib
+import hmac
 import logging
 import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
+
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+
 from app.config import settings
 from app.db.database import init_db
 from app.logging_config import setup_logging
@@ -38,29 +40,33 @@ async def request_logging_middleware(request: Request, call_next):
     elapsed = round((time.time() - start) * 1000)
     logger.info(
         f"[HTTP] {request.method} {request.url.path} "
-        f"→ {response.status_code} ({elapsed}ms)"
-        + (f" [{request_id}]" if request_id else "")
+        f"→ {response.status_code} ({elapsed}ms)" + (f" [{request_id}]" if request_id else "")
     )
     return response
 
 
 def verify_github_signature(payload: bytes, signature: str) -> bool:
-    expected_signature = "sha256=" + hmac.new(
-        settings.GITHUB_WEBHOOK_SECRET.encode("utf-8"),
-        payload,
-        hashlib.sha256,
-    ).hexdigest()
+    expected_signature = (
+        "sha256="
+        + hmac.new(
+            settings.GITHUB_WEBHOOK_SECRET.encode("utf-8"),
+            payload,
+            hashlib.sha256,
+        ).hexdigest()
+    )
     return hmac.compare_digest(expected_signature, signature)
 
 
 def _dispatch_pipeline(repo_name: str, pr_number: int):
     if settings.USE_CELERY:
         from app.tasks import review_pr
+
         review_pr.delay(repo_name, pr_number)
         logger.info(f"[Webhook] Pipeline dispatched to Celery for PR #{pr_number}")
     else:
-        from app.core.orchestrator import run_pipeline
         import asyncio
+
+        from app.core.orchestrator import run_pipeline
 
         async def _run():
             await run_pipeline(repo_name, pr_number)
@@ -75,6 +81,7 @@ def _dispatch_pipeline(repo_name: str, pr_number: int):
 def _dispatch_ingestion(repo_name: str):
     if settings.USE_CELERY:
         from app.tasks import ingest_repo
+
         ingest_repo.delay(repo_name)
         logger.info(f"[API] Ingestion dispatched to Celery for {repo_name}")
     else:
@@ -86,6 +93,7 @@ def _dispatch_ingestion(repo_name: str):
             logger.info(f"[API] Ingestion complete: {result}")
 
         import threading
+
         threading.Thread(target=run_ingestion, daemon=True).start()
 
 
@@ -110,6 +118,7 @@ async def health_check():
     if settings.USE_CELERY:
         try:
             from app.celery_app import celery_app
+
             inspect = celery_app.control.inspect(timeout=2)
             active = inspect.active()
             health["celery"] = "connected" if active else "no workers"
@@ -121,8 +130,8 @@ async def health_check():
 
 @app.get("/metrics")
 async def get_metrics():
-    from app.db.database import SessionLocal
     from app.db.crud import get_evaluation_report, get_stats
+    from app.db.database import SessionLocal
 
     db = SessionLocal()
     try:
@@ -135,8 +144,8 @@ async def get_metrics():
 
 @app.get("/reviews/{repo_owner}/{repo_name}")
 async def list_reviews(repo_owner: str, repo_name: str, limit: int = 20):
-    from app.db.database import SessionLocal
     from app.db.crud import get_all_reviews
+    from app.db.database import SessionLocal
 
     full_repo = f"{repo_owner}/{repo_name}"
     db = SessionLocal()
@@ -188,8 +197,7 @@ async def github_webhook(
     repo_name = payload["repository"]["full_name"]
 
     logger.info(
-        f"[Webhook] Received pull_request — "
-        f"Repo: {repo_name} | PR: #{pr_number} | Action: {action}"
+        f"[Webhook] Received pull_request — Repo: {repo_name} | PR: #{pr_number} | Action: {action}"
     )
 
     background_tasks.add_task(_dispatch_pipeline, repo_name, pr_number)

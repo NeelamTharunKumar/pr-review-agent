@@ -1,13 +1,14 @@
 import logging
+
 from github import Auth, Github, GithubException
+
 from app.config import settings
-from app.core.schemas import PRContext, ChangedFile, RepoContext
+from app.core.schemas import ChangedFile, PRContext, RepoContext
 
 logger = logging.getLogger(__name__)
 
 
 class FetcherAgent:
-
     def __init__(self):
         self.client = Github(auth=Auth.Token(settings.GITHUB_TOKEN))
 
@@ -28,13 +29,15 @@ class FetcherAgent:
 
         changed_files = []
         for github_file in pr.get_files():
-            changed_files.append(ChangedFile(
-                filename=github_file.filename,
-                status=github_file.status,
-                additions=github_file.additions,
-                deletions=github_file.deletions,
-                patch=github_file.patch if github_file.patch else "",
-            ))
+            changed_files.append(
+                ChangedFile(
+                    filename=github_file.filename,
+                    status=github_file.status,
+                    additions=github_file.additions,
+                    deletions=github_file.deletions,
+                    patch=github_file.patch if github_file.patch else "",
+                )
+            )
 
         repo_context = self._fetch_repo_context(repo)
 
@@ -53,39 +56,38 @@ class FetcherAgent:
         )
 
         try:
-            from app.rag.retriever import CodebaseRetriever
             from app.rag.ingestor import CodebaseIngestor
+            from app.rag.retriever import CodebaseRetriever
 
             retriever = CodebaseRetriever()
             collection = retriever.get_collection(context.repo_name)
 
             if collection is None or collection.count() == 0:
                 logger.info(
-                    f"[FetcherAgent] No RAG index found for {repo_name}. "
-                    f"Running auto-ingestion..."
+                    f"[FetcherAgent] No RAG index found for {repo_name}. Running auto-ingestion..."
                 )
                 ingestor = CodebaseIngestor()
                 ingestor.ingest_repo(repo_name)
-                logger.info(f"[FetcherAgent] Auto-ingestion complete")
+                logger.info("[FetcherAgent] Auto-ingestion complete")
 
                 collection = retriever.get_collection(context.repo_name)
 
                 if collection is None or collection.count() == 0:
                     logger.warning(
-                        f"[FetcherAgent] Collection still empty after ingestion "
-                        f"— RAG will be skipped for this review"
+                        "[FetcherAgent] Collection still empty after ingestion "
+                        "— RAG will be skipped for this review"
                     )
 
             rag_context = retriever.retrieve_context(context)
 
             if rag_context:
                 context.rag_context = rag_context
-                logger.info(f"[FetcherAgent] RAG context retrieved successfully")
+                logger.info("[FetcherAgent] RAG context retrieved successfully")
             else:
                 context.rag_context = ""
                 logger.warning(
-                    f"[FetcherAgent] RAG retrieval returned empty "
-                    f"— review will be based on diff only"
+                    "[FetcherAgent] RAG retrieval returned empty "
+                    "— review will be based on diff only"
                 )
 
         except Exception as e:
@@ -115,10 +117,9 @@ class FetcherAgent:
 
         try:
             contents = repo.get_contents("")
-            file_structure = "\n".join([
-                f"{'📁' if c.type == 'dir' else '📄'} {c.name}"
-                for c in contents
-            ])
+            file_structure = "\n".join(
+                [f"{'📁' if c.type == 'dir' else '📄'} {c.name}" for c in contents]
+            )
         except Exception:
             file_structure = "Could not fetch file structure"
 
@@ -132,18 +133,12 @@ class FetcherAgent:
             readme_summary = "No README available"
 
         try:
-            merged_prs = repo.get_pulls(
-                state="closed",
-                sort="updated",
-                direction="desc"
-            )
+            merged_prs = repo.get_pulls(state="closed", sort="updated", direction="desc")
             recent_pr_titles = []
             count = 0
             for merged_pr in merged_prs:
                 if merged_pr.merged:
-                    recent_pr_titles.append(
-                        f"- {merged_pr.title} (by {merged_pr.user.login})"
-                    )
+                    recent_pr_titles.append(f"- {merged_pr.title} (by {merged_pr.user.login})")
                     count += 1
                 if count >= 5:
                     break

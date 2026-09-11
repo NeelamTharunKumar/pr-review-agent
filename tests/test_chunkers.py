@@ -1,11 +1,10 @@
-import pytest
 from app.rag.chunkers import (
-    chunk_javascript,
-    chunk_go,
-    chunk_rust,
-    chunk_file,
-    _chunk_by_lines,
     LANGUAGE_CHUNKERS,
+    _chunk_by_lines,
+    chunk_file,
+    chunk_go,
+    chunk_javascript,
+    chunk_rust,
 )
 
 
@@ -61,7 +60,7 @@ class TestChunkJavaScript:
 
 class TestChunkGo:
     def test_single_function(self):
-        content = "func hello() {\n\tfmt.Println(\"hi\")\n}\n"
+        content = 'func hello() {\n\tfmt.Println("hi")\n}\n'
         chunks = chunk_go("test.go", content)
         assert len(chunks) >= 1
         assert "hello" in chunks[0]["name"]
@@ -104,7 +103,7 @@ class TestChunkRust:
         assert chunks[0]["type"] == "function"
 
     def test_pub_fn(self):
-        content = "pub fn hello() {\n    println!(\"hi\");\n}\n"
+        content = 'pub fn hello() {\n    println!("hi");\n}\n'
         chunks = chunk_rust("test.rs", content)
         assert len(chunks) >= 1
 
@@ -149,7 +148,16 @@ class TestChunkFileDispatch:
 
         def fake_py_chunker(fp, c):
             called.append(fp)
-            return [{"text": c, "filepath": fp, "start_line": 1, "end_line": 1, "type": "function", "name": "x"}]
+            return [
+                {
+                    "text": c,
+                    "filepath": fp,
+                    "start_line": 1,
+                    "end_line": 1,
+                    "type": "function",
+                    "name": "x",
+                }
+            ]
 
         result = chunk_file("app.py", "def foo(): pass", fake_py_chunker)
         assert called == ["app.py"]

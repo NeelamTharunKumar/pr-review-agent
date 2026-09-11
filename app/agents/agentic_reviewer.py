@@ -1,6 +1,7 @@
 import logging
-from app.core.schemas import PRContext, ReviewResult, ReviewComment
+
 from app.core.prompts import build_user_prompt
+from app.core.schemas import PRContext, ReviewComment, ReviewResult
 from app.core.utils import parse_json_response, split_files_into_chunks
 from app.llm import llm_client
 
@@ -63,24 +64,20 @@ REVIEW_PASSES = [
 
 
 class AgenticReviewerAgent:
-
     MODEL = "llama-3.3-70b-versatile"
     MAX_TOKENS = 4096
     TEMPERATURE = 0.1
     CHUNK_SIZE = 80000
 
     def run(self, context: PRContext) -> ReviewResult:
-        logger.info(
-            f"[AgenticReviewer] Starting multi-pass review for PR #{context.pr_number}"
-        )
+        logger.info(f"[AgenticReviewer] Starting multi-pass review for PR #{context.pr_number}")
 
         user_prompt = build_user_prompt(context)
         logger.info(f"[AgenticReviewer] Prompt size: {len(user_prompt)} chars")
 
         if len(user_prompt) > self.CHUNK_SIZE:
             logger.info(
-                f"[AgenticReviewer] Prompt exceeds {self.CHUNK_SIZE} chars — "
-                f"using chunked review"
+                f"[AgenticReviewer] Prompt exceeds {self.CHUNK_SIZE} chars — using chunked review"
             )
             return self._review_chunked(context, user_prompt)
 
@@ -116,9 +113,7 @@ class AgenticReviewerAgent:
                 )
 
             except Exception as e:
-                logger.error(
-                    f"[AgenticReviewer] Pass {review_pass['name']} failed: {e}"
-                )
+                logger.error(f"[AgenticReviewer] Pass {review_pass['name']} failed: {e}")
                 scores.append(5)
 
         merged_comments = self._deduplicate(all_comments)
@@ -198,26 +193,18 @@ class AgenticReviewerAgent:
         deduped = list(seen.values())
         deduped.sort(key=lambda x: severity_order.get(x.get("severity"), 2))
 
-        logger.info(
-            f"[AgenticReviewer] Deduplicated {len(comments)} → {len(deduped)} comments"
-        )
+        logger.info(f"[AgenticReviewer] Deduplicated {len(comments)} → {len(deduped)} comments")
         return deduped
 
-    def _review_chunked(
-        self, context: PRContext, full_prompt: str
-    ) -> ReviewResult:
+    def _review_chunked(self, context: PRContext, full_prompt: str) -> ReviewResult:
         file_chunks = split_files_into_chunks(context.files, self.CHUNK_SIZE)
-        logger.info(
-            f"[AgenticReviewer] Split into {len(file_chunks)} chunks"
-        )
+        logger.info(f"[AgenticReviewer] Split into {len(file_chunks)} chunks")
 
         all_comments: list[dict] = []
         scores: list[int] = []
 
         for i, chunk_files in enumerate(file_chunks, 1):
-            logger.info(
-                f"[AgenticReviewer] Chunk {i}/{len(file_chunks)}"
-            )
+            logger.info(f"[AgenticReviewer] Chunk {i}/{len(file_chunks)}")
 
             chunk_context = PRContext(
                 repo_name=context.repo_name,
@@ -248,14 +235,10 @@ class AgenticReviewerAgent:
                     all_comments.extend(data.get("comments", []))
                     scores.append(data.get("overall_score", 5))
 
-                    logger.info(
-                        f"[AgenticReviewer] Chunk {i} / {review_pass['name']} done"
-                    )
+                    logger.info(f"[AgenticReviewer] Chunk {i} / {review_pass['name']} done")
 
                 except Exception as e:
-                    logger.error(
-                        f"[AgenticReviewer] Chunk {i} / {review_pass['name']} failed: {e}"
-                    )
+                    logger.error(f"[AgenticReviewer] Chunk {i} / {review_pass['name']} failed: {e}")
                     scores.append(5)
 
         merged_comments = self._deduplicate(all_comments)

@@ -1,6 +1,8 @@
 import logging
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,15 +22,10 @@ engine = create_engine(
     echo=False,
 )
 
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db():
-    from app.db import models
     Base.metadata.create_all(bind=engine)
     logger.info("[DB] Database initialized successfully")
 

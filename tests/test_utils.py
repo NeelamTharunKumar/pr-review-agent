@@ -1,12 +1,11 @@
-import pytest
-from app.core.utils import (
-    safe_collection_name,
-    parse_json_response,
-    split_files_into_chunks,
-    parse_diff_new_file_lines,
-    SKIP_PATTERNS,
-)
 from app.core.schemas import ChangedFile
+from app.core.utils import (
+    SKIP_PATTERNS,
+    parse_diff_new_file_lines,
+    parse_json_response,
+    safe_collection_name,
+    split_files_into_chunks,
+)
 
 
 class TestSafeCollectionName:
@@ -62,22 +61,34 @@ class TestParseJsonResponse:
 
 class TestSplitFilesIntoChunks:
     def test_single_chunk(self):
-        files = [ChangedFile(filename="a.py", status="modified", additions=5, deletions=0, patch="+" * 100)]
+        files = [
+            ChangedFile(
+                filename="a.py", status="modified", additions=5, deletions=0, patch="+" * 100
+            )
+        ]
         chunks = split_files_into_chunks(files, chunk_size=10000)
         assert len(chunks) == 1
         assert len(chunks[0]) == 1
 
     def test_multiple_chunks(self):
         files = [
-            ChangedFile(filename="a.py", status="modified", additions=5, deletions=0, patch="+" * 50000),
-            ChangedFile(filename="b.py", status="modified", additions=5, deletions=0, patch="+" * 50000),
-            ChangedFile(filename="c.py", status="modified", additions=5, deletions=0, patch="+" * 50000),
+            ChangedFile(
+                filename="a.py", status="modified", additions=5, deletions=0, patch="+" * 50000
+            ),
+            ChangedFile(
+                filename="b.py", status="modified", additions=5, deletions=0, patch="+" * 50000
+            ),
+            ChangedFile(
+                filename="c.py", status="modified", additions=5, deletions=0, patch="+" * 50000
+            ),
         ]
         chunks = split_files_into_chunks(files, chunk_size=80000)
         assert len(chunks) >= 2
 
     def test_empty_files(self):
-        files = [ChangedFile(filename="a.py", status="modified", additions=0, deletions=0, patch="")]
+        files = [
+            ChangedFile(filename="a.py", status="modified", additions=0, deletions=0, patch="")
+        ]
         chunks = split_files_into_chunks(files, chunk_size=80000)
         assert len(chunks) == 1
 
